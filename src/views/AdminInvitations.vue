@@ -187,6 +187,43 @@ export default {
       this.successMessage = null
       this.errorMessage = null
 
+      // Validate admin ID exists
+      if (!this.adminId) {
+        this.errorMessage = 'Admin ID not found. Please login again.'
+        this.loading = false
+        this.$router.push('/login')
+        return
+      }
+
+      const adminIdInt = parseInt(this.adminId)
+      console.log('🔍 Checking admin ID:', this.adminId, 'parsed as:', adminIdInt)
+
+      try {
+        // Verify that the current admin exists in adminCredentials table
+        const { data: currentAdmin, error: adminCheckErr } = await supabase
+          .from('adminCredentials')
+          .select('*')
+          .eq('id', adminIdInt)
+          .single()
+
+        console.log('✅ Admin check result:', { currentAdmin, adminCheckErr })
+
+        if (adminCheckErr || !currentAdmin) {
+          this.errorMessage = `Your admin account is no longer valid (ID: ${adminIdInt}). Please login again.`
+          console.error('❌ Admin validation error:', adminCheckErr)
+          this.loading = false
+          this.$router.push('/login')
+          return
+        }
+
+        console.log('✅ Admin verified:', currentAdmin.username)
+      } catch (err) {
+        this.errorMessage = 'Error validating admin account: ' + err.message
+        console.error('Error:', err)
+        this.loading = false
+        return
+      }
+
       try {
         // Check if email already exists in adminCredentials
         const { data: existingAdmin } = await supabase

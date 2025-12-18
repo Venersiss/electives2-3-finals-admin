@@ -196,7 +196,7 @@
           <div v-else class="space-y-4">
             <div 
               v-for="item in filteredItems"
-              :key="item.id"
+              :key="item._category + '-' + item.id"
               class="gear-item border-2 border-pixel-gold p-4 rounded bg-slate-700 transition-all"
             >
               <div class="flex justify-between items-start mb-3">
@@ -261,19 +261,25 @@ export default {
     filteredItems() {
       return this.items.filter(item => {
         // Filter by search query
-        const searchLower = this.searchQuery.toLowerCase()
+        const searchLower = this.searchQuery.toLowerCase().trim()
         const itemName = this.getItemName(item).toLowerCase()
-        const matchesSearch = itemName.includes(searchLower)
+        const matchesSearch = !searchLower || itemName.includes(searchLower)
 
         // Filter by category
         const matchesCategory = !this.filterCategory || this.getItemCategory(item) === this.filterCategory
 
         // Filter by source (admin/user)
-        const matchesSource = this.filterSource === 'all' || item.source === this.filterSource
+        const itemSource = item.source ? item.source.toLowerCase() : 'unknown'
+        const matchesSource = this.filterSource === 'all' || itemSource === this.filterSource
 
         const passes = matchesSearch && matchesCategory && matchesSource
-        if (passes) {
-          console.log(`✅ Item "${itemName}" matches filters`)
+        
+        if (searchLower || this.filterCategory || this.filterSource !== 'all') {
+          if (passes) {
+            console.log(`✅ Item "${itemName}" matches - search: "${searchLower}", category: "${this.filterCategory}", source: "${this.filterSource}", item.source: "${itemSource}"`)
+          } else {
+            console.log(`❌ Item "${itemName}" FILTERED OUT - search: ${matchesSearch}, category: ${matchesCategory}, source: ${matchesSource}`)
+          }
         }
         return passes
       })
@@ -285,6 +291,9 @@ export default {
     },
     filterCategory(newVal) {
       console.log('🏷️ filterCategory changed to:', newVal, '- Filtered items:', this.filteredItems.length)
+    },
+    filterSource(newVal) {
+      console.log('🔲 filterSource changed to:', newVal, '- Filtered items:', this.filteredItems.length)
     }
   },
   mounted() {
@@ -319,6 +328,12 @@ export default {
     },
 
     getItemCategory(item) {
+      // If category is stored in metadata, use it
+      if (item._category) {
+        return item._category
+      }
+
+      // Otherwise, try to infer from the field names
       const nameMap = {
         headGear: 'head',
         bodyGear: 'body',
@@ -387,13 +402,17 @@ export default {
 
           console.log(`   ✅ Loaded ${data.length} items from ${table}`)
           data.forEach((item) => {
-            console.log(`      - ${item[table === 'weaponGear' ? 'weapon' : table === 'headGear' ? 'head' : table === 'bodyGear' ? 'body' : 'foot']} (ID: ${item.id})`)
+            // Add category metadata to identify which table it came from
+            item._category = table
+            const fieldName = table === 'weaponGear' ? 'weapon' : table === 'headGear' ? 'head' : table === 'bodyGear' ? 'body' : 'foot'
+            console.log(`      - ${item[fieldName]} (ID: ${item.id}, Source: ${item.source || 'undefined'})`)
           })
           allItems.push(...data)
         }
 
         this.items = allItems
         console.log(`🎉 Total items loaded from ALL tables: ${this.items.length}`)
+        console.log('📋 Items details:', this.items)
       } catch (err) {
         console.error('❌ Error loading items from all tables:', err)
       } finally {
